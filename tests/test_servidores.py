@@ -145,7 +145,10 @@ class RevisionCodigoTest(unittest.TestCase):
             # `correo: false` en Ajustes: nada se acepta
             r = servidores_ciclo.recoger_uno({"nombre": "a", "ssh": "infobar@203.0.113.9", "correo": False}, [])
             self.assertEqual(r["tarjetas"]["puertos"]["raros"], [25, 993])
-            # `correo: true` acepta los de correo aunque no se reconozca el software
+            # `correo: true` acepta todos los de correo, también con un software detectado que no los sirve (un Dovecot sin reconocer)
+            r = servidores_ciclo.recoger_uno({"nombre": "a", "ssh": "infobar@203.0.113.9", "correo": True}, [])
+            self.assertEqual(r["tarjetas"]["puertos"]["raros"], [])
+            # y aunque no se reconozca ningún software
             d.pop("correo"); d.pop("correo_puertos")
             r = servidores_ciclo.recoger_uno({"nombre": "a", "ssh": "infobar@203.0.113.9", "correo": True}, [])
             self.assertEqual(r["tarjetas"]["puertos"]["raros"], [])

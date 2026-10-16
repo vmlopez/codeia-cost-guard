@@ -251,7 +251,6 @@ def interpretar(sec, marcadas=frozenset(), ahora=None):
     if a:
         d["actualizaciones"] = {"pendientes": int(_num(a[0])), "reinicio": len(a) > 1 and a[1] == "reinicio"}
         # «### espera» (si al script le sobró tiempo): lo que `apt upgrade` instalaría de verdad. El resto está en espera
-        # (actualizaciones por fases de Ubuntu, paquetes retenidos): no son pendientes
         # (actualizaciones por fases de Ubuntu, paquetes retenidos): no son pendientes. Nunca baja de los parches de seguridad: un
         # parche retenido (p. ej. un kernel nuevo) sigue siendo pendiente
         e = (sec.get("espera") or [""])[0].split()
