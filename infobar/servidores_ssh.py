@@ -309,10 +309,11 @@ def _servicios(servicios, contenedores):
     return out
 
 
-# servidores de correo conocidos, por el nombre del servicio/contenedor (Dokploy y Easypanel ponen el de la plantilla) o por el servicio del sistema
-_CORREO = (("mailu", "Mailu"), ("mailcow", "mailcow"), ("docker-mailserver", "docker-mailserver"), ("poste", "Poste.io"),
-           ("stalwart", "Stalwart"), ("iredmail", "iRedMail"), ("mailinabox", "Mail-in-a-Box"), ("mail-in-a-box", "Mail-in-a-Box"),
-           ("postfix", "Postfix"), ("dovecot", "Dovecot"), ("exim", "Exim"), ("opensmtpd", "OpenSMTPD"))
+# servidores de correo conocidos. Se compara PALABRA A PALABRA (el nombre partido por guiones, puntos, barras...), nunca como trozo de
+# texto: «correo-mailu-front-1» o «mailcow_postfix» sí, «emailupdater» o «exim-logs-viewer»... solo si una palabra coincide entera
+_CORREO = {"mailu": "Mailu", "mailcow": "mailcow", "mailserver": "docker-mailserver", "poste": "Poste.io", "stalwart": "Stalwart",
+           "iredmail": "iRedMail", "mailinabox": "Mail-in-a-Box", "postfix": "Postfix", "dovecot": "Dovecot", "exim": "Exim",
+           "exim4": "Exim", "opensmtpd": "OpenSMTPD"}
 
 
 def _correo(servicios, contenedores, sistema):
@@ -320,8 +321,11 @@ def _correo(servicios, contenedores, sistema):
     en_marcha = [l.split("\t")[0] for l in servicios if re.match(r"(\d+)/\1(\s|$)", (l.split("\t") + [""])[1].strip()) and "\t0/0" not in l]
     en_marcha += [p[0] for p in (l.split("\t") for l in contenedores) if len(p) >= 2 and p[1] == "running"]
     en_marcha += [l.strip() for l in sistema]
-    texto = " ".join(en_marcha).lower()
-    return next((nombre for clave, nombre in _CORREO if clave in texto), "")
+    for nombre in en_marcha:
+        for palabra in re.split(r"[^a-z0-9]+", nombre.lower()):
+            if palabra in _CORREO:
+                return _CORREO[palabra]
+    return ""
 
 
 def leer(servidor):

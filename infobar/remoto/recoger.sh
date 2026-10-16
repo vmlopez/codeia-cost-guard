@@ -16,7 +16,7 @@ VIGILANTE=$!
 trap 'kill $VIGILANTE 2>/dev/null' EXIT
 
 echo "### version"
-echo 2
+echo 3                                             # 3 = 2 + las secciones opcionales del final (correo, espera)
 
 echo "### sistema"
 t cat /proc/loadavg

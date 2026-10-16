@@ -124,6 +124,10 @@ class RevisionCodigoTest(unittest.TestCase):
         self.assertEqual(c(["mailu_smtp\t0/0"], [], []), "")
         self.assertEqual(c([], [], ["postfix"]), "Postfix")
         self.assertEqual(c(["pspro-db\t1/1"], ["app\trunning\tUp"], []), "")
+        # palabra entera, no trozo de texto
+        self.assertEqual(c([], ["emailupdater\trunning\tUp", "postfixadmin-web\trunning\tUp"], []), "")
+        self.assertEqual(c([], ["mailcowdockerized_postfix-mailcow_1\trunning\tUp"], []), "Postfix")
+        self.assertEqual(c([], [], ["exim4"]), "Exim")
         d = servidores_ssh.interpretar(servidores_ssh.secciones("### correo\ndovecot\n"))
         self.assertEqual(d.get("correo"), "Dovecot")
 
@@ -149,6 +153,7 @@ class RevisionCodigoTest(unittest.TestCase):
         # los del correo van al texto pequeño: en la cifra grande no caben 7 puertos
         self.assertEqual(_puertas([22, 25, 80, 443, 465, 587, 993], {"correo": "Mailu"}), ("22·80·443", "+ correo (Mailu)"))
         self.assertEqual(_puertas([22, 80, 443, 3000, 8080, 9000], {})[0], "6 abiertas")
+        self.assertEqual(_puertas([25, 465], {"correo": "Mailu"}), ("—", "+ correo (Mailu)"))
         self.assertEqual(_puertas([22, 80, 443, 3000], {"raros": [3000]}), ("22·80·443·3000", "¡3000 expuesto!"))
 
     def test_correo_en_config(self):
