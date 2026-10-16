@@ -117,19 +117,38 @@ class RevisionCodigoTest(unittest.TestCase):
         self.assertEqual((vivo, estado), ("verde", "ambar"))
 
     def test_detecta_correo_en_marcha(self):
-        c = servidores_ssh._correo
+        c = lambda *a: servidores_ssh._correo(*a)[0]
         self.assertEqual(c([], ["correo-mailu-nqcdcp-front-1\trunning\tUp 4 hours"], []), "Mailu")
         self.assertEqual(c([], ["mailu-front-1\texited\tExited (0)"], []), "")              # parado no cuenta
         self.assertEqual(c(["mail_smtp\t0/0", "mailcow_x\t1/1"], [], []), "mailcow")
         self.assertEqual(c(["mailu_smtp\t0/0"], [], []), "")
-        self.assertEqual(c([], [], ["postfix"]), "Postfix")
         self.assertEqual(c(["pspro-db\t1/1"], ["app\trunning\tUp"], []), "")
         # palabra entera, no trozo de texto
         self.assertEqual(c([], ["emailupdater\trunning\tUp", "postfixadmin-web\trunning\tUp"], []), "")
-        self.assertEqual(c([], ["mailcowdockerized_postfix-mailcow_1\trunning\tUp"], []), "Postfix")
         self.assertEqual(c([], [], ["exim4"]), "Exim")
+        # cada software trae SUS puertos: Postfix no sirve IMAP
+        self.assertEqual(servidores_ssh._correo([], [], ["postfix"]), ("Postfix", [25, 465, 587]))
+        self.assertEqual(servidores_ssh._correo([], [], ["postfix", "dovecot"]), ("Postfix + Dovecot", [25, 465, 587, 993, 995]))
+        self.assertEqual(servidores_ssh._correo([], ["x-mailu-front-1\trunning\tUp"], [])[1], [25, 465, 587, 993, 995])
         d = servidores_ssh.interpretar(servidores_ssh.secciones("### correo\ndovecot\n"))
-        self.assertEqual(d.get("correo"), "Dovecot")
+        self.assertEqual((d.get("correo"), d.get("correo_puertos")), ("Dovecot", [993, 995]))
+
+    def test_correo_solo_acepta_los_puertos_de_su_software(self):
+        d = {"bastionado": {}, "puertos": [22, 25, 993], "correo": "Postfix", "correo_puertos": [25, 465, 587]}
+        with mock.patch.object(servidores_ciclo, "leer", return_value=(d, "", 0.1)), \
+             mock.patch.object(servidores_ciclo, "puertos_expuestos", return_value=[22, 25, 993]), \
+             mock.patch.object(servidores_ciclo.webs_sondeo, "medidas", return_value=[]):
+            r = servidores_ciclo.recoger_uno({"nombre": "a", "ssh": "infobar@203.0.113.9"}, [])
+            self.assertEqual(r["tarjetas"]["puertos"]["raros"], [993])           # el 993 no lo sirve Postfix: sigue avisando
+            chk = {x["id"]: x for x in r["bastionado"]}["puertos"]
+            self.assertIn("no los sirve", chk["arreglo"])
+            # `correo: false` en Ajustes: nada se acepta
+            r = servidores_ciclo.recoger_uno({"nombre": "a", "ssh": "infobar@203.0.113.9", "correo": False}, [])
+            self.assertEqual(r["tarjetas"]["puertos"]["raros"], [25, 993])
+            # `correo: true` acepta los de correo aunque no se reconozca el software
+            d.pop("correo"); d.pop("correo_puertos")
+            r = servidores_ciclo.recoger_uno({"nombre": "a", "ssh": "infobar@203.0.113.9", "correo": True}, [])
+            self.assertEqual(r["tarjetas"]["puertos"]["raros"], [])
 
     def test_puertos_de_correo(self):
         from infobar.servidores_externo import PUERTOS_CORREO
@@ -167,6 +186,12 @@ class RevisionCodigoTest(unittest.TestCase):
         self.assertEqual(d["actualizaciones"], {"pendientes": 0, "reinicio": False, "en_espera": 3})
         d = servidores_ssh.interpretar(servidores_ssh.secciones("### actualizaciones\n24\nsin-reinicio\n### espera\ninstalables 21\n"))
         self.assertEqual(d["actualizaciones"], {"pendientes": 21, "reinicio": False, "en_espera": 3})
+        # un parche de seguridad retenido sigue siendo pendiente: «espera» nunca lo esconde
+        d = servidores_ssh.interpretar(servidores_ssh.secciones(
+            "### actualizaciones\n5\nsin-reinicio\n### bastionado\nparches_seguridad 2\n### espera\ninstalables 0\n"))
+        self.assertEqual((d["actualizaciones"]["pendientes"], d["actualizaciones"]["en_espera"]), (2, 3))
+        d = servidores_ssh.interpretar(servidores_ssh.secciones("### actualizaciones\n3\nsin-reinicio\n### espera\ninstalables " + "9" * 5000 + "\n"))
+        self.assertEqual(d["actualizaciones"], {"pendientes": 3, "reinicio": False})          # número absurdo: se ignora
         d = servidores_ssh.interpretar(servidores_ssh.secciones("### actualizaciones\n3\nsin-reinicio\n"))     # script antiguo
         self.assertEqual(d["actualizaciones"], {"pendientes": 3, "reinicio": False})
 
